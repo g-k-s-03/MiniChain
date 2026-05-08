@@ -240,6 +240,22 @@ class TestPersistence(unittest.TestCase):
         self.assertEqual(len(restored.chain), 1)
         self.assertTrue(persistence_exists(self.tmpdir))
 
+    def test_corrupt_sqlite_falls_back_to_legacy_json(self):
+        bc = Blockchain()
+        snapshot = {
+            "chain": [block.to_dict() for block in bc.chain],
+            "state": bc.state.accounts,
+        }
+        with open(os.path.join(self.tmpdir, LEGACY_FILE), "w", encoding="utf-8") as f:
+            json.dump(snapshot, f)
+
+        with open(os.path.join(self.tmpdir, DB_FILE), "wb") as f:
+            f.write(b"not-a-valid-sqlite-db")
+
+        restored = load(path=self.tmpdir)
+        self.assertEqual(len(restored.chain), 1)
+        self.assertEqual(restored.chain[0].hash, "0" * 64)
+
 
 if __name__ == "__main__":
     unittest.main()

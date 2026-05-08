@@ -66,7 +66,12 @@ def load(path: str = ".") -> Blockchain:
     legacy_path = os.path.join(path, _LEGACY_DATA_FILE)
 
     if os.path.exists(db_path):
-        snapshot = _load_snapshot_from_sqlite(db_path)
+        try:
+            snapshot = _load_snapshot_from_sqlite(db_path)
+        except ValueError:
+            if not os.path.exists(legacy_path):
+                raise
+            snapshot = _read_legacy_json(legacy_path)
     elif os.path.exists(legacy_path):
         snapshot = _read_legacy_json(legacy_path)
     else:
