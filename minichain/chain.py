@@ -3,6 +3,8 @@ from .state import State
 from .pow import calculate_hash
 import logging
 import threading
+import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -28,22 +30,41 @@ class Blockchain:
     Manages the blockchain, validates blocks, and commits state transitions.
     """
 
-    def __init__(self):
+    def __init__(self, genesis_path="genesis.json"):
         self.chain = []
         self.state = State()
         self._lock = threading.RLock()
-        self._create_genesis_block()
+        self._create_genesis_block(genesis_path)
 
-    def _create_genesis_block(self):
+    def _create_genesis_block(self, genesis_path):
         """
-        Creates the genesis block with a fixed hash.
+        Creates the genesis block and initializes state from config.
         """
+        config = {}
+        if os.path.exists(genesis_path):
+            try:
+                with open(genesis_path, "r") as f:
+                    config = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load genesis config: {e}")
+        
+        # Apply genesis allocations
+        alloc = config.get("alloc", {})
+        for address, data in alloc.items():
+            account = self.state.get_account(address)
+            account['balance'] = data.get("balance", 0)
+
+        timestamp = config.get("timestamp")
+        difficulty = config.get("difficulty")
+        
         genesis_block = Block(
             index=0,
             previous_hash="0",
-            transactions=[]
+            transactions=[],
+            timestamp=timestamp,
+            difficulty=difficulty
         )
-        genesis_block.hash = "0" * 64
+        genesis_block.hash = config.get("hash", "0" * 64)
         self.chain.append(genesis_block)
 
     @property
