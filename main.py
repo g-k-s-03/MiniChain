@@ -149,10 +149,6 @@ def make_network_handler(chain, mempool):
             if chain.add_block(block):
                 logger.info("📥 Received Block #%d — added to chain", block.index)
 
-                # Apply mining reward for the remote miner (burn address as placeholder)
-                miner = payload.get("miner", BURN_ADDRESS)
-                chain.state.credit_mining_reward(miner)
-
                 # Drop only confirmed transactions so higher nonces can remain queued.
                 mempool.remove_transactions(block.transactions)
             else:
