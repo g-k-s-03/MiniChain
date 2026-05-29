@@ -183,6 +183,7 @@ class P2PNetwork:
             "index": int,
             "previous_hash": str,
             "merkle_root": (str, type(None)),
+            "state_root": (str, type(None)),
             "transactions": list,
             "timestamp": int,
             "difficulty": (int, type(None)),

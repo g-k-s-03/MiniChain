@@ -80,6 +80,7 @@ def mine_and_process_block(chain, mempool, miner_pk):
         index=chain.last_block.index + 1,
         previous_hash=chain.last_block.hash,
         transactions=mineable_txs,
+        state_root=temp_state.state_root(),
     )
 
     mined_block = mine_block(block)
