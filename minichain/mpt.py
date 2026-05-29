@@ -7,7 +7,10 @@ def hash_data(data: bytes) -> bytes:
 
 def to_nibbles(key_hex: str) -> List[int]:
     """Converts a hex string key into a list of integer nibbles (0-15)."""
-    return [int(c, 16) for c in key_hex]
+    try:
+        return [int(c, 16) for c in key_hex]
+    except ValueError:
+        raise ValueError(f"Invalid MPT key: '{key_hex}'. Keys must be valid hex strings.")
 
 class Node:
     def hash(self) -> bytes:

@@ -120,6 +120,9 @@ class Blockchain:
                     logger.warning("Block %s rejected: Transaction failed validation", block.index)
                     return False
 
+            if block.miner:
+                temp_state.credit_mining_reward(block.miner)
+
             # Verify state root
             if block.state_root != temp_state.state_root():
                 logger.warning("Block %s rejected: Invalid state root. Expected %s, got %s", block.index, temp_state.state_root(), block.state_root)

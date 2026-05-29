@@ -23,6 +23,8 @@ class State:
         trie = Trie()
         # Sort items to ensure deterministic insertion order if necessary (though MPT is order-independent)
         for addr, acc in sorted(self.accounts.items()):
+            if acc.get('balance', 0) == 0 and acc.get('nonce', 0) == 0 and not acc.get('code') and not acc.get('storage'):
+                continue
             trie.put(addr, json.dumps(acc, sort_keys=True))
         return trie.root_hash()
 

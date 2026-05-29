@@ -42,6 +42,7 @@ class Block:
         timestamp: Optional[float] = None,
         difficulty: Optional[int] = None,
         state_root: Optional[str] = None,
+        miner: Optional[str] = None,
     ):
         self.index = index
         self.previous_hash = previous_hash
@@ -58,6 +59,7 @@ class Block:
         self.nonce: int = 0
         self.hash: Optional[str] = None
         self.state_root: Optional[str] = state_root
+        self.miner: Optional[str] = miner
 
         # NEW: compute merkle root once
         self.merkle_root: Optional[str] = _calculate_merkle_root(self.transactions)
@@ -74,6 +76,7 @@ class Block:
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "nonce": self.nonce,
+            "miner": self.miner,
         }
 
     # -------------------------
@@ -115,6 +118,7 @@ class Block:
             timestamp=payload.get("timestamp"),
             difficulty=payload.get("difficulty"),
             state_root=payload.get("state_root"),
+            miner=payload.get("miner"),
         )
         block.nonce = payload.get("nonce", 0)
         block.hash = payload.get("hash")
