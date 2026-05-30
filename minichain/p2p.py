@@ -184,6 +184,8 @@ class P2PNetwork:
             "previous_hash": str,
             "merkle_root": (str, type(None)),
             "state_root": str,
+            "receipt_root": (str, type(None)),
+            "receipts": list,
             "transactions": list,
             "timestamp": int,
             "difficulty": (int, type(None)),

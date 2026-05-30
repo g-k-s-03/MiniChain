@@ -74,20 +74,19 @@ class State:
         """
         # Semantic validation: amount must be an integer and non-negative
         if not isinstance(tx.amount, int) or tx.amount < 0:
-            return False
+            return None
         # Further checks can be added here
         return self.apply_transaction(tx)
 
     def apply_transaction(self, tx):
+        from .receipt import Receipt
+        
         """
         Applies transaction and mutates state.
-        Returns:
-            - Contract address (str) if deployment
-            - True if successful execution
-            - False if failed
+        Returns: Receipt object if mathematically valid, None if invalid.
         """
         if not self.verify_transaction_logic(tx):
-            return False
+            return None
 
         sender = self.accounts[tx.sender]
 
@@ -102,12 +101,12 @@ class State:
             # Prevent redeploy collision
             existing = self.accounts.get(contract_address)
             if existing and existing.get("code"):
-                # Restore sender state on failure
+                # Restore sender balance on failure, but keep nonce incremented
                 sender['balance'] += tx.amount
-                sender['nonce'] -= 1
-                return False
+                return Receipt(tx.tx_id, status=0, error_message="Contract collision")
 
-            return self.create_contract(contract_address, tx.data, initial_balance=tx.amount)
+            self.create_contract(contract_address, tx.data, initial_balance=tx.amount)
+            return Receipt(tx.tx_id, status=1, contract_address=contract_address)
 
         # LOGIC BRANCH 2: Contract Call
         # If data is provided (non-empty), treat as contract call
@@ -116,10 +115,9 @@ class State:
 
             # Fail if contract does not exist or has no code
             if not receiver or not receiver.get("code"):
-                # Rollback sender balance and nonce on failure
+                # Rollback sender balance on failure, but keep nonce incremented
                 sender['balance'] += tx.amount # Refund amount
-                sender['nonce'] -= 1
-                return False
+                return Receipt(tx.tx_id, status=0, error_message="Contract not found")
 
             # Credit contract balance
             receiver['balance'] += tx.amount
@@ -132,18 +130,17 @@ class State:
             )
 
             if not success:
-                # Rollback transfer and nonce if execution fails
+                # Rollback transfer if execution fails, but keep nonce incremented
                 receiver['balance'] -= tx.amount
                 sender['balance'] += tx.amount # Refund amount
-                sender['nonce'] -= 1
-                return False
+                return Receipt(tx.tx_id, status=0, error_message="Execution failed")
 
-            return True
+            return Receipt(tx.tx_id, status=1)
 
         # LOGIC BRANCH 3: Regular Transfer
         receiver = self.get_account(tx.receiver)
         receiver['balance'] += tx.amount
-        return True
+        return Receipt(tx.tx_id, status=1)
 
     def derive_contract_address(self, sender, nonce):
         raw = f"{sender}:{nonce}".encode()

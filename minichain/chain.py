@@ -72,7 +72,9 @@ class Blockchain:
             transactions=[],
             timestamp=timestamp,
             difficulty=difficulty,
-            state_root=self.state.state_root()
+            state_root=self.state.state_root(),
+            receipt_root=None,
+            receipts=[]
         )
         
         computed_hash = calculate_hash(genesis_block.to_header_dict())
@@ -111,17 +113,26 @@ class Blockchain:
 
             # Validate transactions on a temporary state copy
             temp_state = self.state.copy()
+            receipts = []
 
             for tx in block.transactions:
-                result = temp_state.validate_and_apply(tx)
+                receipt = temp_state.validate_and_apply(tx)
 
-                # Reject block if any transaction fails
-                if not result:
+                # Reject block if any transaction fails mathematical validation (None)
+                if receipt is None:
                     logger.warning("Block %s rejected: Transaction failed validation", block.index)
                     return False
+                    
+                receipts.append(receipt)
 
             if block.miner:
                 temp_state.credit_mining_reward(block.miner)
+                
+            from .block import _calculate_receipt_root
+            computed_receipt_root = _calculate_receipt_root(receipts)
+            if block.receipt_root != computed_receipt_root:
+                logger.warning("Block %s rejected: Invalid receipt root. Expected %s, got %s", block.index, computed_receipt_root, block.receipt_root)
+                return False
 
             # Verify state root
             if block.state_root != temp_state.state_root():

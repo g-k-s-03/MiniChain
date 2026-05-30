@@ -61,13 +61,17 @@ def mine_and_process_block(chain, mempool, miner_pk):
     temp_state = chain.state.copy()
     mineable_txs = []
     stale_txs = []
+    receipts = []
     for tx in pending_txs:
         expected_nonce = temp_state.get_account(tx.sender).get("nonce", 0)
         if tx.nonce < expected_nonce:
             stale_txs.append(tx)
             continue
-        if temp_state.validate_and_apply(tx):
+            
+        receipt = temp_state.validate_and_apply(tx)
+        if receipt is not None:
             mineable_txs.append(tx)
+            receipts.append(receipt)
 
     if stale_txs:
         mempool.remove_transactions(stale_txs)
@@ -78,11 +82,15 @@ def mine_and_process_block(chain, mempool, miner_pk):
 
     temp_state.credit_mining_reward(miner_pk)
 
+    from minichain.block import _calculate_receipt_root
+
     block = Block(
         index=chain.last_block.index + 1,
         previous_hash=chain.last_block.hash,
         transactions=mineable_txs,
         state_root=temp_state.state_root(),
+        receipt_root=_calculate_receipt_root(receipts),
+        receipts=receipts,
         miner=miner_pk,
     )
 

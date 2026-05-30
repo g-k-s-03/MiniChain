@@ -42,14 +42,17 @@ class TestPersistence(unittest.TestCase):
         tx.sign(alice_sk)
 
         temp_state = bc.state.copy()
-        temp_state.validate_and_apply(tx)
+        receipt = temp_state.validate_and_apply(tx)
 
+        from minichain.block import _calculate_receipt_root
         block = Block(
             index=1,
             previous_hash=bc.last_block.hash,
             transactions=[tx],
             difficulty=1,
             state_root=temp_state.state_root(),
+            receipt_root=_calculate_receipt_root([receipt]),
+            receipts=[receipt],
         )
         mine_block(block, difficulty=1)
         bc.add_block(block)
@@ -221,14 +224,17 @@ class TestPersistence(unittest.TestCase):
         tx2.sign(new_sk)
 
         temp_state = restored.state.copy()
-        temp_state.validate_and_apply(tx2)
+        receipt2 = temp_state.validate_and_apply(tx2)
 
+        from minichain.block import _calculate_receipt_root
         block2 = Block(
             index=len(restored.chain),
             previous_hash=restored.last_block.hash,
             transactions=[tx2],
             difficulty=1,
             state_root=temp_state.state_root(),
+            receipt_root=_calculate_receipt_root([receipt2]),
+            receipts=[receipt2],
         )
         mine_block(block2, difficulty=1)
 

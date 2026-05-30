@@ -2,35 +2,37 @@ import time
 import hashlib
 from typing import List, Optional
 from .transaction import Transaction
+from .receipt import Receipt
 from .serialization import canonical_json_hash
 
 def _sha256(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
 
+def _calculate_merkle_tree(hashes: List[str]) -> Optional[str]:
+    if not hashes:
+        return None
+    while len(hashes) > 1:
+        if len(hashes) % 2 != 0:
+            hashes.append(hashes[-1])
+        new_level = []
+        for i in range(0, len(hashes), 2):
+            combined = hashes[i] + hashes[i + 1]
+            new_level.append(_sha256(combined))
+        hashes = new_level
+    return hashes[0]
+
 def _calculate_merkle_root(transactions: List[Transaction]) -> Optional[str]:
     if not transactions:
         return None
+    return _calculate_merkle_tree([tx.tx_id for tx in transactions])
 
-    # Hash each transaction deterministically
-    tx_hashes = [
-        tx.tx_id
-        for tx in transactions
-    ]
+def _calculate_receipt_root(receipts: List[Receipt]) -> Optional[str]:
+    if not receipts:
+        return None
+    return _calculate_merkle_tree([canonical_json_hash(r.to_dict()) for r in receipts])
 
-    # Build Merkle tree
-    while len(tx_hashes) > 1:
-        if len(tx_hashes) % 2 != 0:
-            tx_hashes.append(tx_hashes[-1])  # duplicate last if odd
-
-        new_level = []
-        for i in range(0, len(tx_hashes), 2):
-            combined = tx_hashes[i] + tx_hashes[i + 1]
-            new_level.append(_sha256(combined))
-
-        tx_hashes = new_level
-
-    return tx_hashes[0]
+    # Logic moved to _calculate_merkle_tree
 
 
 class Block:
@@ -42,11 +44,14 @@ class Block:
         timestamp: Optional[float] = None,
         difficulty: Optional[int] = None,
         state_root: Optional[str] = None,
+        receipt_root: Optional[str] = None,
+        receipts: Optional[List[Receipt]] = None,
         miner: Optional[str] = None,
     ):
         self.index = index
         self.previous_hash = previous_hash
         self.transactions: List[Transaction] = transactions or []
+        self.receipts: List[Receipt] = receipts or []
 
         # Deterministic timestamp (ms)
         self.timestamp: int = (
@@ -59,10 +64,15 @@ class Block:
         self.nonce: int = 0
         self.hash: Optional[str] = None
         self.state_root: Optional[str] = state_root
+        self.receipt_root: Optional[str] = receipt_root
         self.miner: Optional[str] = miner
 
-        # NEW: compute merkle root once
+        # NEW: compute merkle roots once
         self.merkle_root: Optional[str] = _calculate_merkle_root(self.transactions)
+        
+        # If receipt_root is missing but we have receipts, calculate it.
+        if self.receipt_root is None and self.receipts:
+            self.receipt_root = _calculate_receipt_root(self.receipts)
 
     # -------------------------
     # HEADER (used for mining)
@@ -73,6 +83,7 @@ class Block:
             "previous_hash": self.previous_hash,
             "merkle_root": self.merkle_root,
             "state_root": self.state_root,
+            "receipt_root": self.receipt_root,
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "nonce": self.nonce,
@@ -86,6 +97,9 @@ class Block:
         return {
             "transactions": [
                 tx.to_dict() for tx in self.transactions
+            ],
+            "receipts": [
+                r.to_dict() for r in self.receipts
             ]
         }
 
@@ -111,6 +125,10 @@ class Block:
             Transaction.from_dict(tx_payload)
             for tx_payload in payload.get("transactions", [])
         ]
+        receipts = [
+            Receipt.from_dict(r_payload)
+            for r_payload in payload.get("receipts", [])
+        ]
         block = cls(
             index=payload["index"],
             previous_hash=payload["previous_hash"],
@@ -118,6 +136,8 @@ class Block:
             timestamp=payload.get("timestamp"),
             difficulty=payload.get("difficulty"),
             state_root=payload.get("state_root"),
+            receipt_root=payload.get("receipt_root"),
+            receipts=receipts,
             miner=payload.get("miner"),
         )
         block.nonce = payload.get("nonce", 0)
