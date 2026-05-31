@@ -78,10 +78,10 @@ def mine_and_process_block(chain, mempool, miner_pk):
         return None
 
     block = Block(
-    index=chain.last_block.index + 1,
-    previous_hash=chain.last_block.hash,
-    transactions=mineable_txs,
-    miner=miner_pk,  # ← ADD THIS
+        index=chain.last_block.index + 1,
+        previous_hash=chain.last_block.hash,
+        transactions=mineable_txs,
+        miner=miner_pk,
     )
 
     mined_block = mine_block(block)
