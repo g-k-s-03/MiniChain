@@ -59,6 +59,8 @@ class Block:
         self.difficulty: Optional[int] = difficulty
         self.nonce: int = 0
         self.hash: Optional[str] = None
+        self.state_root: Optional[str] = state_root
+        self.miner: Optional[str] = miner
 
         # NEW: compute merkle root once
         self.merkle_root: Optional[str] = _calculate_merkle_root(self.transactions)
@@ -71,9 +73,11 @@ class Block:
             "index": self.index,
             "previous_hash": self.previous_hash,
             "merkle_root": self.merkle_root,
+            "state_root": self.state_root,
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "nonce": self.nonce,
+            "miner": self.miner,
         }
         # Include miner in header only when present (optional field)  <-- Reworded comment
         if self.miner is not None:

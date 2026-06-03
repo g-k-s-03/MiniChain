@@ -19,7 +19,6 @@ Commands (type in the terminal while the node is running):
 import argparse
 import asyncio
 import logging
-import os
 import re
 import sys
 
@@ -77,6 +76,8 @@ def mine_and_process_block(chain, mempool, miner_pk):
         logger.info("No mineable transactions in current queue window.")
         return None
 
+    temp_state.credit_mining_reward(miner_pk)
+
     block = Block(
         index=chain.last_block.index + 1,
         previous_hash=chain.last_block.hash,
@@ -89,7 +90,6 @@ def mine_and_process_block(chain, mempool, miner_pk):
     if chain.add_block(mined_block):
         logger.info("✅ Block #%d mined and added (%d txs)", mined_block.index, len(mineable_txs))
         mempool.remove_transactions(mineable_txs)
-        chain.state.credit_mining_reward(miner_pk)
         return mined_block
     else:
         logger.error("❌ Block rejected by chain")
@@ -147,10 +147,6 @@ def make_network_handler(chain, mempool):
 
             if chain.add_block(block):
                 logger.info("📥 Received Block #%d — added to chain", block.index)
-
-                # Apply mining reward for the remote miner (burn address as placeholder)
-                miner = payload.get("miner", BURN_ADDRESS)
-                chain.state.credit_mining_reward(miner)
 
                 # Drop only confirmed transactions so higher nonces can remain queued.
                 mempool.remove_transactions(block.transactions)
@@ -295,11 +291,12 @@ async def run_node(port: int, host: str, connect_to: str | None, fund: int, data
 
     # Load existing chain from disk, or start fresh
     chain = None
-    if datadir and os.path.exists(os.path.join(datadir, "data.json")):
+    if datadir:
         try:
-            from minichain.persistence import load
-            chain = load(datadir)
-            logger.info("Restored chain from '%s'", datadir)
+            from minichain.persistence import load, persistence_exists
+            if persistence_exists(datadir):
+                chain = load(datadir)
+                logger.info("Restored chain from '%s'", datadir)
         except FileNotFoundError as e:
             logger.warning("Could not load saved chain: %s — starting fresh", e)
         except ValueError as e:
