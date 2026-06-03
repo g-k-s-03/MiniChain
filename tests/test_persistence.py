@@ -44,14 +44,14 @@ class TestPersistence(unittest.TestCase):
         temp_state = bc.state.copy()
         receipt = temp_state.validate_and_apply(tx)
 
-        from minichain.block import _calculate_receipt_root
+        from minichain.block import calculate_receipt_root
         block = Block(
             index=1,
             previous_hash=bc.last_block.hash,
             transactions=[tx],
             difficulty=1,
             state_root=temp_state.state_root(),
-            receipt_root=_calculate_receipt_root([receipt]),
+            receipt_root=calculate_receipt_root([receipt]),
             receipts=[receipt],
         )
         mine_block(block, difficulty=1)
@@ -226,14 +226,14 @@ class TestPersistence(unittest.TestCase):
         temp_state = restored.state.copy()
         receipt2 = temp_state.validate_and_apply(tx2)
 
-        from minichain.block import _calculate_receipt_root
+        from minichain.block import calculate_receipt_root
         block2 = Block(
             index=len(restored.chain),
             previous_hash=restored.last_block.hash,
             transactions=[tx2],
             difficulty=1,
             state_root=temp_state.state_root(),
-            receipt_root=_calculate_receipt_root([receipt2]),
+            receipt_root=calculate_receipt_root([receipt2]),
             receipts=[receipt2],
         )
         mine_block(block2, difficulty=1)

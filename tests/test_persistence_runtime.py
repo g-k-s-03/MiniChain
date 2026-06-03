@@ -66,14 +66,14 @@ class TestPersistenceRuntime(unittest.IsolatedAsyncioTestCase):
         temp_state = bc.state.copy()
         receipt = temp_state.validate_and_apply(tx)
 
-        from minichain.block import _calculate_receipt_root
+        from minichain.block import calculate_receipt_root
         block = Block(
             index=1,
             previous_hash=bc.last_block.hash,
             transactions=[tx],
             difficulty=1,
             state_root=temp_state.state_root(),
-            receipt_root=_calculate_receipt_root([receipt]),
+            receipt_root=calculate_receipt_root([receipt]),
             receipts=[receipt],
         )
         mine_block(block, difficulty=1)

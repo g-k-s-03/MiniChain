@@ -1,8 +1,11 @@
+import copy
+import json
+import logging
 from nacl.hash import sha256
 from nacl.encoding import HexEncoder
 from .contract import ContractMachine
-import copy
-import logging
+from .mpt import Trie
+from .receipt import Receipt
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +21,6 @@ class State:
         Dynamically builds the Merkle Patricia Trie from the current state dictionary
         and returns the cryptographic state root hash.
         """
-        import json
-        from .mpt import Trie
         trie = Trie()
         # Sort items to ensure deterministic insertion order if necessary (though MPT is order-independent)
         for addr, acc in sorted(self.accounts.items()):
@@ -42,17 +43,17 @@ class State:
 
     def verify_transaction_logic(self, tx):
         if not tx.verify():
-            logger.error(f"Error: Invalid signature for tx from {tx.sender[:8]}...")
+            logger.error("Error: Invalid signature for tx from %s...", tx.sender[:8])
             return False
 
         sender_acc = self.get_account(tx.sender)
 
         if sender_acc['balance'] < tx.amount:
-            logger.error(f"Error: Insufficient balance for {tx.sender[:8]}...")
+            logger.error("Error: Insufficient balance for %s...", tx.sender[:8])
             return False
 
         if sender_acc['nonce'] != tx.nonce:
-            logger.error(f"Error: Invalid nonce. Expected {sender_acc['nonce']}, got {tx.nonce}")
+            logger.error("Error: Invalid nonce. Expected %s, got %s", sender_acc['nonce'], tx.nonce)
             return False
 
         return True
@@ -79,8 +80,6 @@ class State:
         return self.apply_transaction(tx)
 
     def apply_transaction(self, tx):
-        from .receipt import Receipt
-        
         """
         Applies transaction and mutates state.
         Returns: Receipt object if mathematically valid, None if invalid.

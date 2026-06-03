@@ -109,7 +109,7 @@ class TestP2PValidationAndDedup(unittest.IsolatedAsyncioTestCase):
         tx.sign(sender_sk)
 
         from minichain.receipt import Receipt
-        from minichain.block import _calculate_receipt_root
+        from minichain.block import calculate_receipt_root
         receipt = Receipt(tx_hash=tx.tx_id, status=1)
 
         block = Block(
@@ -120,7 +120,7 @@ class TestP2PValidationAndDedup(unittest.IsolatedAsyncioTestCase):
             difficulty=2, 
             state_root="0"*64,
             receipts=[receipt],
-            receipt_root=_calculate_receipt_root([receipt])
+            receipt_root=calculate_receipt_root([receipt])
         )
         block.nonce = 9
         block.hash = block.compute_hash()

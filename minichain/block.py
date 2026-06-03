@@ -27,12 +27,10 @@ def _calculate_merkle_root(transactions: List[Transaction]) -> Optional[str]:
         return None
     return _calculate_merkle_tree([tx.tx_id for tx in transactions])
 
-def _calculate_receipt_root(receipts: List[Receipt]) -> Optional[str]:
+def calculate_receipt_root(receipts: List[Receipt]) -> Optional[str]:
     if not receipts:
         return None
     return _calculate_merkle_tree([canonical_json_hash(r.to_dict()) for r in receipts])
-
-    # Logic moved to _calculate_merkle_tree
 
 
 class Block:
@@ -72,7 +70,7 @@ class Block:
         
         # If receipt_root is missing but we have receipts, calculate it.
         if self.receipt_root is None and self.receipts:
-            self.receipt_root = _calculate_receipt_root(self.receipts)
+            self.receipt_root = calculate_receipt_root(self.receipts)
 
     # -------------------------
     # HEADER (used for mining)

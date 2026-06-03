@@ -141,7 +141,7 @@ class P2PNetwork:
             if not isinstance(payload.get(field), expected_type):
                 return False
 
-        if payload["amount"] <= 0:
+        if payload["amount"] < 0:
             return False
 
         receiver = payload.get("receiver")

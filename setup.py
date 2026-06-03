@@ -7,7 +7,7 @@ setup(
     py_modules=["main"],
     install_requires=[
         "PyNaCl>=1.5.0",
-        "libp2p>=0.5.0", # Correct PyPI package name
+        "trie>=3.1.0",
     ],
     entry_points={
         "console_scripts": [
