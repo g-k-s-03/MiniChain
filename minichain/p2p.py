@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 
-from .serialization import canonical_json_hash
+from .serialization import canonical_json_hash, canonical_json_dumps
 from .validators import is_valid_receiver
 
 logger = logging.getLogger(__name__)
@@ -58,9 +58,7 @@ class P2PNetwork:
     async def start(self, port: int = 9000, host: str = "127.0.0.1"):
         """Start listening for incoming peer connections on the given port."""
         self._port = port
-        self._server = await asyncio.start_server(
-            self._handle_incoming, host, port
-        )
+        self._server = await asyncio.start_server(self._handle_incoming, host, port)
         logger.info("Network: Listening on %s:%d", host, port)
 
     async def stop(self):
@@ -230,7 +228,9 @@ class P2PNetwork:
         )
 
     def _validate_message(self, message):
+        # FIX: Check if message is a dictionary first to prevent crashes
         if not isinstance(message, dict):
+            logger.warning("Network: Received non-dict message")
             return False
         required_fields = {"type", "data"}
         if not required_fields.issubset(set(message)):
@@ -328,22 +328,32 @@ class P2PNetwork:
                 self._peers.remove((reader, writer))
 
     async def _broadcast_raw(self, payload: dict):
-        """Send a JSON message to every connected peer."""
-        line = (json.dumps(payload) + "\n").encode()
-        disconnected = []
-        for reader, writer in self._peers:
+        """Send a JSON message to every connected peer concurrently."""
+        line = (canonical_json_dumps(payload) + "\n").encode()
+        peers_snapshot = list(self._peers)
+
+        async def _send(reader, writer):
+            """Send to a single peer; return the pair on failure."""
             try:
                 writer.write(line)
                 await writer.drain()
+                return None
             except Exception:
-                disconnected.append((reader, writer))
-        for reader, writer in disconnected:
+                return (reader, writer)
+
+        results = await asyncio.gather(
+            *(_send(r, w) for r, w in peers_snapshot)
+        )
+
+        for pair in results:
+            if pair is None:
+                continue
+            _reader, writer = pair
             try:
                 writer.close()
                 await writer.wait_closed()
             except Exception:
                 pass
-            pair = (reader, writer)
             if pair in self._peers:
                 self._peers.remove(pair)
 
@@ -358,12 +368,19 @@ class P2PNetwork:
         self._mark_seen("tx", payload["data"])
         await self._broadcast_raw(payload)
 
-    async def broadcast_block(self, block, miner=None):
+    async def broadcast_block(self, block):
+        """Broadcast a block. Block must have miner populated."""
         logger.info("Network: Broadcasting Block #%d", block.index)
-        block_payload = block.to_dict()
-        if miner is not None:
-            block_payload["miner"] = miner
-        payload = {"type": "block", "data": block_payload}
+
+        # Enforce that the block is fully populated before it enters the network layer
+        if getattr(block, "miner", None) is None:
+            raise ValueError("block.miner must be populated before broadcasting")
+
+        payload = {
+            "type": "block",
+            "data": block.to_dict()
+        }
+
         self._mark_seen("block", payload["data"])
         await self._broadcast_raw(payload)
 

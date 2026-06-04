@@ -1,63 +1,65 @@
 import time
 import hashlib
-from typing import List, Optional
+from typing import Optional  # <-- Removed 'List' as requested
+from collections.abc import Sequence
+
 from .transaction import Transaction
 from .receipt import Receipt
-from .serialization import canonical_json_hash
+from .serialization import canonical_json_hash, canonical_json_bytes
 
 def _sha256(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
-
-def _calculate_merkle_tree(hashes: List[str]) -> Optional[str]:
+def _calculate_merkle_tree(hashes: Sequence[str]) -> Optional[str]:
     if not hashes:
         return None
-    while len(hashes) > 1:
-        if len(hashes) % 2 != 0:
-            hashes.append(hashes[-1])
+    hashes_list = list(hashes)
+    while len(hashes_list) > 1:
+        if len(hashes_list) % 2 != 0:
+            hashes_list.append(hashes_list[-1])
         new_level = []
-        for i in range(0, len(hashes), 2):
-            combined = hashes[i] + hashes[i + 1]
+        for i in range(0, len(hashes_list), 2):
+            combined = hashes_list[i] + hashes_list[i + 1]
             new_level.append(_sha256(combined))
-        hashes = new_level
-    return hashes[0]
+        hashes_list = new_level
+    return hashes_list[0]
 
-def _calculate_merkle_root(transactions: List[Transaction]) -> Optional[str]:
+# <-- Updated to Sequence to accept the frozen tuple
+def _calculate_merkle_root(transactions: Sequence[Transaction]) -> Optional[str]:
     if not transactions:
         return None
     return _calculate_merkle_tree([tx.tx_id for tx in transactions])
 
-def calculate_receipt_root(receipts: List[Receipt]) -> Optional[str]:
+def calculate_receipt_root(receipts: Sequence[Receipt]) -> Optional[str]:
     if not receipts:
         return None
     return _calculate_merkle_tree([canonical_json_hash(r.to_dict()) for r in receipts])
-
 
 class Block:
     def __init__(
         self,
         index: int,
         previous_hash: str,
-        transactions: Optional[List[Transaction]] = None,
+        transactions: Optional[Sequence[Transaction]] = None,
         timestamp: Optional[float] = None,
         difficulty: Optional[int] = None,
         state_root: Optional[str] = None,
         receipt_root: Optional[str] = None,
-        receipts: Optional[List[Receipt]] = None,
+        receipts: Optional[Sequence[Receipt]] = None,
         miner: Optional[str] = None,
     ):
         self.index = index
         self.previous_hash = previous_hash
-        self.transactions: List[Transaction] = transactions or []
-        self.receipts: List[Receipt] = receipts or []
-
+        # Freeze transactions into an immutable tuple to prevent header/body mismatch
+        self.transactions = tuple(transactions) if transactions else ()
+        self.receipts = tuple(receipts) if receipts else ()
+        self.miner = miner
         # Deterministic timestamp (ms)
         self.timestamp: int = (
             round(time.time() * 1000)
             if timestamp is None
             else int(timestamp)
         )
-
         self.difficulty: Optional[int] = difficulty
         self.nonce: int = 0
         self.hash: Optional[str] = None
@@ -76,7 +78,7 @@ class Block:
     # HEADER (used for mining)
     # -------------------------
     def to_header_dict(self):
-        return {
+        header = {
             "index": self.index,
             "previous_hash": self.previous_hash,
             "merkle_root": self.merkle_root,
@@ -87,7 +89,11 @@ class Block:
             "nonce": self.nonce,
             "miner": self.miner,
         }
-
+        # Include miner in header only when present (optional field)  <-- Reworded comment
+        if self.miner is not None:
+            header["miner"] = self.miner          
+        return header
+        
     # -------------------------
     # BODY (transactions only)
     # -------------------------
@@ -105,11 +111,10 @@ class Block:
     # FULL BLOCK
     # -------------------------
     def to_dict(self):
-        return {
-            **self.to_header_dict(),
-            **self.to_body_dict(),
-            "hash": self.hash,
-        }
+        data = self.to_header_dict()
+        data.update(self.to_body_dict()) # Reuses existing serialization logic
+        data["hash"] = self.hash
+        return data
 
     # -------------------------
     # HASH CALCULATION
@@ -127,19 +132,45 @@ class Block:
             Receipt.from_dict(r_payload)
             for r_payload in payload.get("receipts", [])
         ]
+        
+        # Safely extract and cast difficulty if it exists
+        raw_diff = payload.get("difficulty")
+        parsed_diff = int(raw_diff) if raw_diff is not None else None
+        
+        # Safely extract and cast timestamp if it exists <-- Added explicit timestamp casting
+        raw_ts = payload.get("timestamp")
+        parsed_ts = int(raw_ts) if raw_ts is not None else None
         block = cls(
-            index=payload["index"],
+            index=int(payload["index"]),  
             previous_hash=payload["previous_hash"],
             transactions=transactions,
-            timestamp=payload.get("timestamp"),
-            difficulty=payload.get("difficulty"),
+            timestamp=parsed_ts,          # <-- Passed the casted timestamp
+            difficulty=parsed_diff,       
             state_root=payload.get("state_root"),
             receipt_root=payload.get("receipt_root"),
             receipts=receipts,
             miner=payload.get("miner"),
         )
-        block.nonce = payload.get("nonce", 0)
+        block.nonce = int(payload.get("nonce", 0))  
         block.hash = payload.get("hash")
-        if "merkle_root" in payload:
-            block.merkle_root = payload["merkle_root"]
+      
+        # Verify the block hash
+        expected_hash = block.compute_hash()
+        if block.hash is not None and block.hash != expected_hash:
+            raise ValueError("block hash does not match header")
+
+        # Recalculate and verify the Merkle root!
+        if "merkle_root" in payload and payload["merkle_root"] != block.merkle_root:
+            raise ValueError("merkle_root does not match transactions")
         return block
+
+    @property
+    def canonical_payload(self) -> bytes:
+        """Returns the full block (header + body) as canonical bytes for networking."""
+        # Sanity checks to prevent broadcasting invalid blocks
+        if self.hash is None:
+            raise ValueError("block hash is missing")
+        if self.hash != self.compute_hash():
+            raise ValueError("block hash does not match header")
+        
+        return canonical_json_bytes(self.to_dict())
