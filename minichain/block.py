@@ -87,7 +87,6 @@ class Block:
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "nonce": self.nonce,
-            "miner": self.miner,
         }
         # Include miner in header only when present (optional field)  <-- Reworded comment
         if self.miner is not None:
@@ -162,6 +161,12 @@ class Block:
         # Recalculate and verify the Merkle root!
         if "merkle_root" in payload and payload["merkle_root"] != block.merkle_root:
             raise ValueError("merkle_root does not match transactions")
+            
+        if "receipt_root" in payload:
+            expected_receipt_root = calculate_receipt_root(block.receipts)
+            if payload["receipt_root"] != expected_receipt_root:
+                raise ValueError("receipt_root does not match receipts")
+                
         return block
 
     @property
