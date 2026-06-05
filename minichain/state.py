@@ -48,8 +48,9 @@ class State:
 
         sender_acc = self.get_account(tx.sender)
 
-        if sender_acc['balance'] < tx.amount:
-            logger.error("Error: Insufficient balance for %s...", tx.sender[:8])
+        total_cost = tx.amount + getattr(tx, 'fee', 0)
+        if sender_acc['balance'] < total_cost:
+            logger.warning("Invalid tx %s: insufficient balance", tx.tx_id)
             return False
 
         if sender_acc['nonce'] != tx.nonce:
@@ -89,8 +90,10 @@ class State:
 
         sender = self.accounts[tx.sender]
 
+        total_cost = tx.amount + getattr(tx, 'fee', 0)
+        
         # Deduct funds and increment nonce
-        sender['balance'] -= tx.amount
+        sender['balance'] -= total_cost
         sender['nonce'] += 1
 
         # LOGIC BRANCH 1: Contract Deployment

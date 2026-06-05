@@ -80,7 +80,8 @@ def mine_and_process_block(chain, mempool, miner_pk):
         logger.info("No mineable transactions in current queue window.")
         return None
 
-    temp_state.credit_mining_reward(miner_pk)
+    total_fees = sum(getattr(tx, 'fee', 0) for tx in mineable_txs)
+    temp_state.credit_mining_reward(miner_pk, reward=temp_state.DEFAULT_MINING_REWARD + total_fees)
 
     block = Block(
         index=chain.last_block.index + 1,
@@ -213,7 +214,7 @@ async def cli_loop(sk, pk, chain, mempool, network):
         # ── send ──
         elif cmd == "send":
             if len(parts) < 3:
-                print("  Usage: send <receiver_address> <amount>")
+                print("  Usage: send <receiver_address> <amount> [fee]")
                 continue
             receiver = parts[1]
             if not is_valid_receiver(receiver):
@@ -221,15 +222,19 @@ async def cli_loop(sk, pk, chain, mempool, network):
                 continue
             try:
                 amount = int(parts[2])
+                fee = int(parts[3]) if len(parts) > 3 else 0
             except ValueError:
-                print("  Amount must be an integer.")
+                print("  Amount and fee must be integers.")
                 continue
             if amount <= 0:
                 print("  Amount must be greater than 0.")
                 continue
+            if fee < 0:
+                print("  Fee cannot be negative.")
+                continue
 
             nonce = chain.state.get_account(pk).get("nonce", 0)
-            tx = Transaction(sender=pk, receiver=receiver, amount=amount, nonce=nonce)
+            tx = Transaction(sender=pk, receiver=receiver, amount=amount, nonce=nonce, fee=fee)
             tx.sign(sk)
 
             if mempool.add_transaction(tx):
