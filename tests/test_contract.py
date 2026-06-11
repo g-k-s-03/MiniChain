@@ -180,3 +180,39 @@ raise Exception("boom")
         balance_after = self.state.get_account(self.pk)["balance"]
         # Entire fee should be deducted because gas was completely consumed
         self.assertEqual(balance_after, balance_before - 1000)
+
+    def test_malicious_import(self):
+        """Contract attempting to import a module should fail AST validation."""
+        code = "import os\nstorage['x'] = 1"
+        tx_deploy = Transaction(self.pk, None, 0, 0, fee=500, data=code)
+        tx_deploy.sign(self.sk)
+        
+        receipt_deploy = self.state.apply_transaction(tx_deploy)
+        self.assertEqual(receipt_deploy.status, 1) # Deploy succeeds, saves code
+
+        tx_call = Transaction(self.pk, receipt_deploy.contract_address, 0, 1, fee=500, data="call")
+        tx_call.sign(self.sk)
+        receipt_call = self.state.apply_transaction(tx_call)
+        
+        self.assertIsNotNone(receipt_call)
+        self.assertEqual(receipt_call.status, 0)
+        self.assertEqual(receipt_call.error_message, "AST Validation Failed")
+
+    def test_malicious_file_deletion(self):
+        """Contract attempting to use open() or file IO should fail at runtime due to missing builtins."""
+        # Using open() which is stripped from __builtins__
+        code = "f = open('critical_file.txt', 'w')\nf.write('hacked')"
+        tx_deploy = Transaction(self.pk, None, 0, 0, fee=500, data=code)
+        tx_deploy.sign(self.sk)
+        
+        receipt_deploy = self.state.apply_transaction(tx_deploy)
+        self.assertEqual(receipt_deploy.status, 1)
+
+        tx_call = Transaction(self.pk, receipt_deploy.contract_address, 0, 1, fee=500, data="call")
+        tx_call.sign(self.sk)
+        receipt_call = self.state.apply_transaction(tx_call)
+
+        self.assertIsNotNone(receipt_call)
+        self.assertEqual(receipt_call.status, 0)
+        # Should throw a NameError because 'open' is not defined in safe_builtins
+        self.assertIn("name 'open' is not defined", receipt_call.error_message)

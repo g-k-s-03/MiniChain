@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit):
     """
     Worker function to execute contract code in a separate process with gas metering.
+    
+    SECURITY:
+    This function relies on `globals_dict` (which has `__builtins__` stripped down 
+    to a minimal safe allowlist) to prevent malicious code from accessing file systems
+    (e.g., `open()`), networking, or OS-level commands (e.g., `__import__('os')`).
+    Because `exec` is run with these restricted globals, any attempt to call unauthorized
+    builtins or standard library modules will result in a NameError or ImportError.
     """
     try:
         # Attempt to set resource limits (Unix only)
@@ -59,6 +66,17 @@ class ContractMachine:
     """
     A minimal execution environment for Python-based smart contracts.
     WARNING: Still not production-safe. For educational use only.
+    
+    SANDBOX ENFORCEMENT:
+    1. Builtins Restriction: `__builtins__` is aggressively filtered. Functions like 
+       `open`, `exec`, `eval`, `__import__`, `print`, and `input` are completely removed.
+       This inherently prevents file deletion, network requests, or OS command execution.
+    2. AST Validation: `_validate_code_ast` statically analyzes the code before execution 
+       to block double-underscore access (preventing sandbox escape via introspection) 
+       and entirely blocks the `import` statement.
+    
+    Allowed Builtins: range(), len(), min(), max(), abs(), str(), bool(), float(), int(), list(), dict(), tuple(), sum(), Exception
+    Blocked Builtins: Imports, File IO (open), OS modules, Networking, Introspection.
     """
 
     def __init__(self, state):
