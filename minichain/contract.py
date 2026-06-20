@@ -45,6 +45,17 @@ def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit)
         except (OSError, ValueError) as e:
             logger.warning("Failed to set resource limits: %s", e)
 
+        transfers = []
+        
+        def transfer_out(address, amount):
+            if not isinstance(amount, int) or amount <= 0:
+                raise ValueError("Invalid transfer amount")
+            if not isinstance(address, str):
+                raise ValueError("Invalid address type")
+            transfers.append({"to": address, "amount": amount})
+            
+        globals_dict["__builtins__"]["transfer_out"] = transfer_out
+
         meter = GasMeter(gas_limit)
         sys.settrace(meter.trace_calls)
         
@@ -54,7 +65,7 @@ def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit)
             sys.settrace(None)
             
         gas_used = meter.initial_gas - meter.gas
-        result_queue.put({"status": "success", "storage": context_dict.get("storage"), "gas_used": gas_used})
+        result_queue.put({"status": "success", "storage": context_dict.get("storage"), "transfers": transfers, "gas_used": gas_used})
     except OutOfGasException as e:
         result_queue.put({"status": "error", "error": "Out of gas!", "gas_used": gas_limit})
     except Exception as e:
@@ -172,13 +183,7 @@ class ContractMachine:
                 logger.error("Contract storage not JSON serializable")
                 return {"success": False, "gas_used": result.get("gas_used", gas_limit), "error": "Storage not JSON serializable"}
 
-            # Commit updated storage only after successful execution
-            self.state.update_contract_storage(
-                contract_address,
-                result["storage"]
-            )
-
-            return {"success": True, "gas_used": result["gas_used"], "error": None}
+            return {"success": True, "gas_used": result["gas_used"], "transfers": result.get("transfers", []), "storage": result["storage"], "error": None}
 
         except Exception as e:
             logger.error("Contract Execution Failed", exc_info=True)
