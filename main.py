@@ -3,14 +3,14 @@ MiniChain interactive node — testnet demo entry point.
 
 Usage:
     python main.py --port 9000
-    python main.py --port 9001 --connect 127.0.0.1:9000
+    python main.py --port 9001 --connect <multiaddress>
 
 Commands (type in the terminal while the node is running):
     balance                 — show all account balances
     send <to> <amount>      — send coins to another address
     mine                    — mine a block from the mempool
     peers                   — show connected peers
-    connect <host>:<port>   — connect to another node
+    connect <multiaddr>     — connect to another node
     address                 — show this node's public key
     help                    — show available commands
     quit                    — shut down the node
@@ -147,12 +147,19 @@ def make_network_handler(chain, mempool, network):
             logger.info("🔄 Accepted state sync from %s — %d accounts", peer_addr, len(chain.state.accounts))
 
         elif msg_type == "tx":
-            tx = Transaction.from_dict(payload)
-            if mempool.add_transaction(tx):
-                logger.info("📥 Received tx from %s... (amount=%s)", tx.sender[:8], tx.amount)
+            try:
+                tx = Transaction.from_dict(payload)
+                if mempool.add_transaction(tx):
+                    logger.info("📥 Received tx from %s... (amount=%s)", tx.sender[:8], tx.amount)
+            except Exception as e:
+                logger.warning("Invalid tx payload from %s: %s", peer_addr, e)
 
         elif msg_type == "block":
-            block = Block.from_dict(payload)
+            try:
+                block = Block.from_dict(payload)
+            except Exception as e:
+                logger.warning("Invalid block payload from %s: %s", peer_addr, e)
+                return
 
             if chain.add_block(block):
                 logger.info("📥 Received Block #%d — added to chain", block.index)
@@ -350,19 +357,14 @@ async def cli_loop(sk, pk, chain, mempool, network):
         # ── connect ──
         elif cmd == "connect":
             if len(parts) < 2:
-                print("  Usage: connect <host>:<port>")
+                print("  Usage: connect <multiaddress>")
                 continue
-            try:
-                host, port_str = parts[1].rsplit(":", 1)
-                port = int(port_str)
-            except ValueError:
-                print("  Invalid format. Use host:port")
-                continue
-            success = await network.connect_to_peer(host, port)
+            maddr_str = parts[1]
+            success = await network.connect_to_peer(maddr_str)
             if success:
-                print(f"  Connected to {host}:{port}")
+                print(f"  Attempting to dial {maddr_str}...")
             else:
-                print(f"  Failed to connect to {host}:{port}")
+                print(f"  Failed to initiate connection to {maddr_str}")
 
         # ── address ──
         elif cmd == "address":
@@ -447,11 +449,7 @@ async def run_node(port: int, host: str, connect_to: str | None, fund: int, data
 
     # Connect to a seed peer if requested
     if connect_to:
-        try:
-            host, peer_port = connect_to.rsplit(":", 1)
-            await network.connect_to_peer(host, int(peer_port))
-        except ValueError:
-            logger.error("Invalid --connect format. Use host:port")
+        await network.connect_to_peer(connect_to)
 
     try:
         await cli_loop(sk, pk, chain, mempool, network)
@@ -474,7 +472,7 @@ def main():
     parser = argparse.ArgumentParser(description="MiniChain Node — Testnet Demo")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host/IP to bind the P2P server (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9000, help="TCP port to listen on (default: 9000)")
-    parser.add_argument("--connect", type=str, default=None, help="Peer address to connect to (host:port)")
+    parser.add_argument("--connect", type=str, default=None, help="Peer address to connect to (multiaddr)")
     parser.add_argument("--fund", type=int, default=100, help="Initial coins to fund this wallet (default: 100)")
     parser.add_argument("--datadir", type=str, default=None, help="Directory to save/load blockchain state (enables persistence)")
     args = parser.parse_args()
