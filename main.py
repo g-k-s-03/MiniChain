@@ -122,6 +122,9 @@ def make_network_handler(chain, mempool, network):
         payload = data.get("data")
         peer_addr = data.get("_peer_addr", "unknown")
 
+        if payload is None and msg_type in ("hello", "chain_request", "chain_response"):
+            return
+
         if msg_type == "hello":
             peer_chain_id = payload.get("chain_id")
             peer_gen_hash = payload.get("genesis_hash")

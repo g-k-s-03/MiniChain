@@ -38,7 +38,7 @@ def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit)
         try:
             import resource
             # Limit CPU time (seconds) and memory (bytes) - example values
-            resource.setrlimit(resource.RLIMIT_CPU, (2, 2)) # Align with p.join timeout (2 seconds)
+            resource.setrlimit(resource.RLIMIT_CPU, (10, 10)) # Align with p.join timeout (10 seconds)
             resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
         except ImportError:
             logger.warning("Resource module not available. Contract will run without OS-level resource limits.")

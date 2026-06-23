@@ -61,7 +61,7 @@ storage['malicious_state'] = 'corrupted'
         contract_addr = receipt.contract_address
 
         # 2. Call Contract
-        call_tx = self._sign(Transaction(self.sender_pk, contract_addr, amount=0, nonce=1, data={"target": self.target_pk}, fee=1000))
+        call_tx = self._sign(Transaction(self.sender_pk, contract_addr, amount=50, nonce=1, data={"target": self.target_pk}, fee=1000))
         receipt2 = self.state.apply_transaction(call_tx)
         
         # Should fail with status 0
@@ -72,6 +72,11 @@ storage['malicious_state'] = 'corrupted'
         self.assertEqual(self.state.get_account(contract_addr)['balance'], 100)
         self.assertEqual(self.state.get_account(self.target_pk)['balance'], 0)
         
+        # Sender's balance should have decreased by only the fee amount (or gas_used if refunded) as the 50 amount was refunded
+        # Starting balance 10000, minus (100+1000) for deploy = 8900
+        # Call tx net cost is receipt2.gas_used
+        self.assertEqual(self.state.get_account(self.sender_pk)['balance'], 8900 - receipt2.gas_used)
+
         # Storage should NOT be updated
         self.assertEqual(self.state.get_account(contract_addr)['storage'], {})
 

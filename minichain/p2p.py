@@ -31,6 +31,8 @@ class P2PNetwork:
         self._seen_block_hashes = set()
         self._to_trio = queue.Queue()
         self._to_asyncio = queue.Queue()
+        self._peer_count = 0
+        self._peer_count_lock = threading.Lock()
 
     def register_handler(self, handler_callback):
         self._handler_callback = handler_callback
@@ -96,7 +98,8 @@ class P2PNetwork:
 
     @property
     def peer_count(self) -> int:
-        return 0
+        with self._peer_count_lock:
+            return self._peer_count
 
     async def _asyncio_reader(self):
         while True:
@@ -132,6 +135,8 @@ class P2PNetwork:
 
         async def stream_handler(stream):
             streams.append(stream)
+            with self._peer_count_lock:
+                self._peer_count += 1
             peer_id = stream.muxed_conn.peer_id
             addr = f"peer:{peer_id}"
             self._to_asyncio.put(("PEER_CONNECTED", None))
@@ -147,7 +152,10 @@ class P2PNetwork:
                             self._to_asyncio.put(("MSG", msg))
                         except Exception: pass
             except Exception: pass
-            if stream in streams: streams.remove(stream)
+            if stream in streams:
+                streams.remove(stream)
+                with self._peer_count_lock:
+                    self._peer_count -= 1
             
         host.set_stream_handler(PROTOCOL_ID, stream_handler)
 
@@ -185,7 +193,10 @@ class P2PNetwork:
                                 if addr == arg:
                                     try: await s.reset()
                                     except Exception: pass
-                                    if s in streams: streams.remove(s)
+                                    if s in streams:
+                                        streams.remove(s)
+                                        with self._peer_count_lock:
+                                            self._peer_count -= 1
                 except Exception: pass
                 await trio.sleep(0.1)
 
