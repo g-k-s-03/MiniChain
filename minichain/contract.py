@@ -38,7 +38,7 @@ def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit)
         try:
             import resource
             # Limit CPU time (seconds) and memory (bytes) - example values
-            resource.setrlimit(resource.RLIMIT_CPU, (2, 2)) # Align with p.join timeout (2 seconds)
+            resource.setrlimit(resource.RLIMIT_CPU, (10, 10)) # Align with p.join timeout (10 seconds)
             resource.setrlimit(resource.RLIMIT_AS, (100 * 1024 * 1024, 100 * 1024 * 1024))
         except ImportError:
             logger.warning("Resource module not available. Contract will run without OS-level resource limits.")
@@ -52,6 +52,12 @@ def _safe_exec_worker(code, globals_dict, context_dict, result_queue, gas_limit)
                 raise ValueError("Invalid transfer amount")
             if not isinstance(address, str):
                 raise ValueError("Invalid address type")
+            if not address or len(address) not in (40, 64):
+                raise ValueError("Invalid address format")
+            try:
+                int(address, 16)
+            except ValueError:
+                raise ValueError("Invalid address format")
             transfers.append({"to": address, "amount": amount})
             
         globals_dict["__builtins__"]["transfer_out"] = transfer_out
@@ -158,7 +164,7 @@ class ContractMachine:
                 args=(code, globals_for_exec, context, queue, gas_limit)
             )
             p.start()
-            p.join(timeout=2)  # 2 second timeout
+            p.join(timeout=10)  # 10 second timeout
 
             if p.is_alive():
                 p.kill()

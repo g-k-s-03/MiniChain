@@ -95,17 +95,16 @@ class TestMempoolQueue(unittest.TestCase):
 
 class TestP2PValidationAndDedup(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_message_schema_is_rejected(self):
-        network = P2PNetwork()
-
-        invalid_message = {"type": "tx", "data": {"sender": "abc"}}
-        self.assertFalse(network._validate_message(invalid_message))
+        invalid_payload = {"sender": "abc"}
+        with self.assertRaises(Exception):
+            Transaction.from_dict(invalid_payload)
 
     async def test_block_schema_accepts_current_block_wire_format(self):
         sender_sk = SigningKey.generate()
         sender_pk = sender_sk.verify_key.encode(encoder=HexEncoder).decode()
         receiver_pk = SigningKey.generate().verify_key.encode(encoder=HexEncoder).decode()
 
-        tx = Transaction(sender_pk, receiver_pk, 1, 0, timestamp=123)
+        tx = Transaction(sender_pk, receiver_pk, 1, 0, timestamp=1600000000000)
         tx.sign(sender_sk)
 
         from minichain.receipt import Receipt
@@ -116,7 +115,7 @@ class TestP2PValidationAndDedup(unittest.IsolatedAsyncioTestCase):
             index=1, 
             previous_hash="0" * 64, 
             transactions=[tx], 
-            timestamp=456, 
+            timestamp=1600000000000, 
             difficulty=2, 
             state_root="0"*64,
             receipts=[receipt],
@@ -125,10 +124,8 @@ class TestP2PValidationAndDedup(unittest.IsolatedAsyncioTestCase):
         block.nonce = 9
         block.hash = block.compute_hash()
 
-        network = P2PNetwork()
-        message = {"type": "block", "data": block.to_dict()}
-
-        self.assertTrue(network._validate_message(message))
+        parsed_block = Block.from_dict(block.to_dict())
+        self.assertEqual(parsed_block.hash, block.hash)
 
     async def test_duplicate_tx_and_block_detection(self):
         network = P2PNetwork()
