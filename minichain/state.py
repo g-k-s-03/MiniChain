@@ -157,6 +157,23 @@ class State:
                 sender['balance'] += tx.amount # Refund amount
                 return Receipt(tx.tx_id, status=0, error_message=result.get("error", "Execution failed"), gas_used=gas_used)
 
+            transfers = result.get("transfers", [])
+            total_transferred_out = sum(t["amount"] for t in transfers)
+
+            if total_transferred_out > receiver['balance']:
+                # Rollback transfer if execution attempts to spend more than balance
+                receiver['balance'] -= tx.amount
+                sender['balance'] += tx.amount # Refund amount
+                return Receipt(tx.tx_id, status=0, error_message="Insufficient contract balance for transfers", gas_used=gas_used)
+
+            # Execution & transfers valid: commit state changes atomically
+            self.update_contract_storage(tx.receiver, result["storage"])
+            
+            receiver['balance'] -= total_transferred_out
+            for t in transfers:
+                target_acc = self.get_account(t["to"])
+                target_acc['balance'] += t["amount"]
+
             return Receipt(tx.tx_id, status=1, gas_used=gas_used)
 
         # LOGIC BRANCH 3: Regular Transfer
