@@ -229,7 +229,7 @@ def make_network_handler(chain, mempool, network):
                     for block in new_chain:
                         if block.index <= chain.last_block.index:
                             continue # Ignore already known blocks
-                        if chain.add_block(block):
+                        if chain.add_block(block) == ValidationStatus.VALID:
                             logger.info("📥 Synced Block #%d", block.index)
                             mempool.remove_transactions(block.transactions)
                         else:
@@ -273,7 +273,7 @@ HELP_TEXT = """
 """
 
 
-async def cli_loop(sk, pk, chain, mempool, network):
+async def cli_loop(sk, pk, chain, mempool, network, datadir: str | None = None):
     """Read commands from stdin asynchronously."""
     loop = asyncio.get_event_loop()
     print(HELP_TEXT)
@@ -434,7 +434,7 @@ async def cli_loop(sk, pk, chain, mempool, network):
         # ── list-banned ──
         elif cmd == "list-banned":
             from minichain.persistence import get_banned_peers
-            banned = get_banned_peers()
+            banned = get_banned_peers(path=datadir or ".")
             if not banned:
                 print("  No peers are currently banned.")
             else:
@@ -449,7 +449,8 @@ async def cli_loop(sk, pk, chain, mempool, network):
                 continue
             peer_id = parts[1]
             from minichain.persistence import ban_peer
-            ban_peer(peer_id, reason="Manual ban via CLI")
+            ban_peer(peer_id, reason="Manual ban via CLI", path=datadir or ".")
+            asyncio.create_task(network.disconnect_peer(peer_id))
             print(f"  ✅ Peer {peer_id} banned.")
 
         # ── unban ──
@@ -459,7 +460,7 @@ async def cli_loop(sk, pk, chain, mempool, network):
                 continue
             peer_id = parts[1]
             from minichain.persistence import unban_peer
-            unban_peer(peer_id)
+            unban_peer(peer_id, path=datadir or ".")
             print(f"  ✅ Peer {peer_id} unbanned.")
 
         # ── help ──
@@ -501,7 +502,7 @@ async def run_node(port: int, host: str, connect_to: str | None, fund: int, data
         chain = Blockchain()
 
     mempool = Mempool()
-    network = P2PNetwork()
+    network = P2PNetwork(data_path=datadir or ".")
 
     handler = make_network_handler(chain, mempool, network)
     network.register_handler(handler)
@@ -542,7 +543,7 @@ async def run_node(port: int, host: str, connect_to: str | None, fund: int, data
         await network.connect_to_peer(connect_to)
 
     try:
-        await cli_loop(sk, pk, chain, mempool, network)
+        await cli_loop(sk, pk, chain, mempool, network, datadir)
     finally:
         # Save chain to disk on shutdown
         if datadir:
