@@ -282,19 +282,19 @@ ASCII_LOGO = gradient_text(RAW_LOGO, (255, 205, 0), (0, 132, 61))
 
 HELP_TEXT = f"""
 {C_BOLD}{ASCII_LOGO}{C_RESET}
-{C_CYAN}╔══════════════════════════════════════════════════════════╗{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}balance{C_RESET}                 - show all balances             {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}send <to> <amount>{C_RESET}      - send coins                    {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}deploy <file>{C_RESET}           - deploy a contract             {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}call <addr> <data>{C_RESET}      - call a contract               {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}mine{C_RESET}                    - mine a block                  {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}peers{C_RESET}                   - show connected peers          {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}connect <multiaddr>{C_RESET}     - connect to a peer             {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}address{C_RESET}                 - show your public key          {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}chain{C_RESET}                   - show chain summary            {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}help{C_RESET}                    - show this help                {C_CYAN}║{C_RESET}
-{C_CYAN}║{C_RESET}  {C_GREEN}quit{C_RESET}                    - shut down                     {C_CYAN}║{C_RESET}
-{C_CYAN}╚══════════════════════════════════════════════════════════╝{C_RESET}
+{C_CYAN}╔══════════════════════════════════════════════════════════════╗{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}balance{C_RESET}                 - show all balances                 {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}send <to> <amount>{C_RESET}      - send coins                        {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}deploy <file>{C_RESET}           - deploy a contract                 {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}call <addr> <data>{C_RESET}      - call a contract                   {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}mine{C_RESET}                    - mine a block                      {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}peers{C_RESET}                   - show connected peers              {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}connect <multiaddr>{C_RESET}     - connect to a peer                 {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}address{C_RESET}                 - show your public key              {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}chain{C_RESET}                   - show chain summary                {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}help{C_RESET}                    - show this help                    {C_CYAN}║{C_RESET}
+{C_CYAN}║{C_RESET}  {C_GREEN}quit{C_RESET}                    - shut down                         {C_CYAN}║{C_RESET}
+{C_CYAN}╚══════════════════════════════════════════════════════════════╝{C_RESET}
 """
 
 
